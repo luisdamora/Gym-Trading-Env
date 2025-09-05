@@ -1,4 +1,3 @@
-
 <h1 align='center'>
    <img src = 'https://github.com/ClementPerroud/Gym-Trading-Env/raw/main/docs/source/images/logo_light-bg.png' width='500'>
 </h1>
@@ -26,67 +25,67 @@
   
 # Gym Trading Env
 
-Entorno basado en Gymnasium para simular mercados y entrenar agentes de Aprendizaje por Refuerzo (RL) en trading. Está diseñado para ser rápido, simple de usar y altamente personalizable.
+Gymnasium-based environment to simulate markets and train Reinforcement Learning (RL) agents for trading. It is designed to be fast, easy to use, and highly customizable.
 
-| [Documentación](https://gym-trading-env.readthedocs.io/en/latest/index.html) |
+| [Documentation](https://gym-trading-env.readthedocs.io/en/latest/index.html) |
 
-## Características clave
+## Key features
 
-- Descarga rápida de datos OHLCV desde múltiples exchanges vía `ccxt`.
-- Entornos simples y veloces que soportan operaciones avanzadas (short, interés por préstamo, comisiones) con posiciones continuas o discretas.
-- Renderizador web de alto rendimiento para visualizar miles de velas, posiciones y métricas personalizadas.
-- Soporte para múltiples datasets y ejecución vectorizada con la API de Gymnasium.
+- Fast OHLCV data download from multiple exchanges via `ccxt`.
+- Simple and fast environments supporting advanced operations (shorting, borrow interest, fees) with continuous or discrete positions.
+- High-performance web renderer to visualize thousands of candles, positions, and custom metrics.
+- Support for multiple datasets and vectorized execution with the Gymnasium API.
 
-Imagen de ejemplo de renderizado:
+Rendering example:
 
 ![Render animated image](https://raw.githubusercontent.com/ClementPerroud/Gym-Trading-Env/main/docs/source/images/render.gif)
 
-## IDs de entornos registrados
+## Registered environment IDs
 
-Los entornos se registran en `src/gym_trading_env/__init__.py` y pueden crearse con `gym.make(...)` o `gym.make_vec(...)`:
+Environments are registered in `src/gym_trading_env/__init__.py` and can be created with `gym.make(...)` or `gym.make_vec(...)`:
 
-- `TradingEnv`: entorno para un único dataset.
-- `MultiDatasetTradingEnv`: entorno que itera sobre múltiples datasets preprocesados.
+- `TradingEnv`: environment for a single dataset.
+- `MultiDatasetTradingEnv`: environment that iterates over multiple preprocessed datasets.
 
-## Instalación
+## Installation
 
-Requiere Python 3.9+ (Linux, macOS o Windows).
+Requires Python 3.9+ (Linux, macOS or Windows).
 
-- Opción 1 (PyPI):
+- Option 1 (PyPI):
 
 ```bash
 pip install gym-trading-env
 ```
 
-- Opción 2 (clonando el repo):
+- Option 2 (clone the repo):
 
 ```bash
 git clone https://github.com/ClementPerroud/Gym-Trading-Env
 cd Gym-Trading-Env
 ```
 
-Si usas Poetry para gestionar dependencias del proyecto:
+If you use Poetry to manage this project's dependencies:
 
 ```bash
 poetry install
 ```
 
-## Formato de datos de entrada
+## Input data format
 
-Los DataFrames deben tener índice `DatetimeIndex` y, como mínimo, las columnas: `open`, `high`, `low`, `close` y `volume` (o `Volume USD` en algunos ejemplos). Las características (features) que formarán parte de la observación deben incluir la palabra `feature` en su nombre, por ejemplo: `feature_close`, `feature_volume`, etc.
+DataFrames must have a `DatetimeIndex` and at least the columns: `open`, `high`, `low`, `close`, and `volume` (or `Volume USD` in some examples). Features that will be part of the observation must include the word `feature` in their name, e.g., `feature_close`, `feature_volume`, etc.
 
-## Ejemplo rápido (single dataset)
+## Quick example (single dataset)
 
 ```python
 import gymnasium as gym
 import numpy as np
 import pandas as pd
 
-# Cargar datos
+# Load data
 df = pd.read_csv("examples/data/BTC_USD-Hourly.csv", parse_dates=["date"], index_col="date").sort_index()
 df = df.dropna().drop_duplicates()
 
-# Crear features (nota: deben contener la palabra 'feature')
+# Create features (note: names must contain the word 'feature')
 df["feature_close"] = df["close"].pct_change()
 df["feature_open"] = df["open"] / df["close"]
 df["feature_high"] = df["high"] / df["close"]
@@ -95,7 +94,7 @@ df["feature_volume"] = df["Volume USD"] / df["Volume USD"].rolling(7 * 24).max()
 df.dropna(inplace=True)
 
 def reward_function(history):
-    # Recompensa por log-retorno del valor del portafolio
+    # Reward: log-return of the portfolio value
     return np.log(history["portfolio_valuation", -1] / history["portfolio_valuation", -2])
 
 env = gym.make(
@@ -118,20 +117,20 @@ while not done and not truncated:
     action = env.action_space.sample()
     obs, reward, done, truncated, info = env.step(action)
 
-# Guardar logs para el renderizador
+# Save logs for the renderer
 env.save_for_render()
 ```
 
-Consulta `examples/example_environnement.py` para un script completo.
+See `examples/example_environnement.py` for a complete script.
 
-## Ejecución vectorizada (single dataset)
+## Vectorized execution (single dataset)
 
 ```python
 import gymnasium as gym
 import numpy as np
 import pandas as pd
 
-# Preparar df y reward_function como en el ejemplo anterior...
+# Prepare df and reward_function as in the previous example...
 
 env = gym.make_vec(
     id="TradingEnv",
@@ -153,9 +152,9 @@ while True:
     obs, reward, done, truncated, info = env.step(actions)
 ```
 
-Consulta `examples/example_vectorized_environment.py`.
+See `examples/example_vectorized_environment.py`.
 
-## Múltiples datasets (con preprocesamiento)
+## Multiple datasets (with preprocessing)
 
 ```python
 import gymnasium as gym
@@ -190,17 +189,17 @@ env = gym.make(
 )
 ```
 
-Versiones vectorizadas: `examples/example_vectorized_multi_environment.py`.
+Vectorized versions: `examples/example_vectorized_multi_environment.py`.
 
-## Descarga de datos (ccxt)
+## Data download (ccxt)
 
-Usa `gym_trading_env.downloader.download` para descargar OHLCV y guardar `.pkl` listos para usar:
+Use `gym_trading_env.downloader.download` to download OHLCV and save ready-to-use `.pkl` files:
 
 ```python
 import datetime as dt
 from gym_trading_env.downloader import EXCHANGE_LIMIT_RATES, download
 
-# Opcional: ajustar límites por exchange
+# Optional: adjust limits per exchange
 EXCHANGE_LIMIT_RATES["bybit"] = {"limit": 200, "pause_every": 120, "pause": 2}
 
 download(
@@ -212,30 +211,30 @@ download(
 )
 ```
 
-Consulta `examples/example_download.py`.
+See `examples/example_download.py`.
 
-## Renderizador web
+## Web renderer
 
 ```python
 from gym_trading_env.renderer import Renderer
 
 renderer = Renderer(render_logs_dir="render_logs")
 
-# Líneas y métricas personalizadas (opcional)
+# Custom lines and metrics (optional)
 # renderer.add_line("sma10", lambda df: df["close"].rolling(10).mean(), {"width": 1, "color": "purple"})
 # renderer.add_metric("Annual Market Return", lambda df: "...")
 
 renderer.run()
 ```
 
-Consulta `examples/example_render.py`.
+See `examples/example_render.py`.
 
-## Cómo ejecutar los ejemplos
+## How to run the examples
 
-Desde la raíz del repo:
+From the repo root:
 
 ```bash
-# Con Poetry (recomendado en este repo)
+# With Poetry (recommended in this repo)
 poetry run python examples/example_environnement.py
 poetry run python examples/example_vectorized_environment.py
 poetry run python examples/example_multi_environnement.py
@@ -243,19 +242,19 @@ poetry run python examples/example_vectorized_multi_environment.py
 poetry run python examples/example_render.py
 ```
 
-También puedes ejecutar con `python` directamente si ya tienes las dependencias instaladas en tu entorno actual.
+You can also run with `python` directly if you already have the dependencies installed in your current environment.
 
-## Estructura relevante del proyecto
+## Relevant project structure
 
-- `src/gym_trading_env/`: implementación principal
-  - `environments.py`: clases `TradingEnv` y `MultiDatasetTradingEnv`
-  - `downloader.py`: utilidades asíncronas para descargar OHLCV (`ccxt`)
-  - `renderer.py`: servidor Flask para visualizar sesiones
-  - `utils/`: historial, portafolio, y utilidades de gráficos
-- `examples/`: scripts listos para ejecutar que cubren descarga, ejecución, vectorización y renderizado
+- `src/gym_trading_env/`: main implementation
+  - `environments.py`: `TradingEnv` and `MultiDatasetTradingEnv` classes
+  - `downloader.py`: asynchronous utilities to download OHLCV (`ccxt`)
+  - `renderer.py`: Flask server to visualize sessions
+  - `utils/`: history, portfolio, and plotting utilities
+- `examples/`: ready-to-run scripts covering download, execution, vectorization, and rendering
 
-## Licencia
+## License
 
-Este proyecto se distribuye bajo la licencia MIT. Consulta `LICENSE.txt` para más detalles.
+This project is distributed under the MIT license. See `LICENSE.txt` for details.
 
 [Documentation available here](https://gym-trading-env.readthedocs.io/en/latest/index.html)
