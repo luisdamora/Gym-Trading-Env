@@ -50,12 +50,16 @@ async def _download_symbol(
     exchange,
     symbol,
     timeframe="5m",
-    since=int(datetime.datetime(year=2020, month=1, day=1).timestamp() * 1e3),
-    until=int(datetime.datetime.now().timestamp() * 1e3),
+    since=None,
+    until=None,
     limit=1000,
     pause_every=10,
     pause=1,
 ):
+    if since is None:
+        since = int(datetime.datetime(year=2020, month=1, day=1).timestamp() * 1e3)
+    if until is None:
+        until = int(datetime.datetime.now().timestamp() * 1e3)
     timedelta = int(pd.Timedelta(timeframe).to_timedelta64() / 1e6)
     tasks = []
     results = []
@@ -97,8 +101,10 @@ async def _download(
     timeframe,
     dir,
     since: datetime.datetime,
-    until: datetime.datetime = datetime.datetime.now(),
+    until: datetime.datetime = None,
 ):
+    if until is None:
+        until = datetime.datetime.now()
     tasks = []
     for exchange_name in exchange_names:
         limit = EXCHANGE_LIMIT_RATES[exchange_name]["limit"]
