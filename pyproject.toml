@@ -11,7 +11,7 @@ authors = [
 ]
 description = "A simple, easy, customizable Open IA Gym environments for trading."
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.11"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
@@ -26,6 +26,14 @@ dependencies = [
     "ccxt==3.0.59",
     "nest_asyncio"
 ]
+
+[project.scripts]
+gte-example-download = "gym_trading_env.cli_examples:example_download"
+gte-example-env = "gym_trading_env.cli_examples:example_env"
+gte-example-multi-env = "gym_trading_env.cli_examples:example_multi_env"
+gte-example-render = "gym_trading_env.cli_examples:example_render"
+gte-example-vec-env = "gym_trading_env.cli_examples:example_vec_env"
+gte-example-vec-multi-env = "gym_trading_env.cli_examples:example_vec_multi_env"
 
 [tool.ruff]
 line-length = 100
