@@ -2,7 +2,9 @@ import pyecharts.options as opts
 from pyecharts.charts import Bar, Candlestick, Grid, Line
 
 
-def charts(df, lines=[]):
+def charts(df, lines=None):
+    if lines is None:
+        lines = []
     line_key = "ievi4G3vG678Vszad"
     for line in lines:
         df[line_key + line["name"]] = line["function"](df)
@@ -374,14 +376,4 @@ def charts(df, lines=[]):
         ),
     )
 
-    grid_global = Grid(
-        init_opts=opts.InitOpts(
-            # width="950px",
-            # height="700px",
-            animation_opts=opts.AnimationOpts(animation=False),
-            bg_color="white",
-            is_horizontal_center=True,
-        )
-    )
     return grid_chart
-    grid_chart.render("render.html")

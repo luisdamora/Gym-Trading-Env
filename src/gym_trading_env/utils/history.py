@@ -40,7 +40,9 @@ class History:
             self.size = min(self.size + 1, self.height)
         else:
             raise ValueError(
-                f"Make sur that your inputs match the initial ones... Initial ones : {self.columns}. New ones {columns}"
+                f"Make sur that your inputs match the initial ones... Initial ones : "
+                f"{self.columns}. "
+                f"New ones {columns}"
             )
 
     def __len__(self):
@@ -51,10 +53,11 @@ class History:
             column, t = arg
             try:
                 column_index = self.columns.index(column)
-            except ValueError:
+            except ValueError as err:
                 raise ValueError(
-                    f"Feature {column} does not exist ... Check the available features : {self.columns}"
-                )
+                    f"Feature {column} does not exist ... Check the available features : "
+                    f"{self.columns}"
+                ) from err
             return self.history_storage[: self.size][t, column_index]
         if isinstance(arg, int):
             t = arg
@@ -63,10 +66,13 @@ class History:
             column = arg
             try:
                 column_index = self.columns.index(column)
-            except ValueError:
+            except ValueError as err:
                 raise ValueError(
-                    f"Feature {column} does not exist ... Check the available features : {self.columns}"
-                )
+                    (
+                        f"Feature {column} does not exist ... Check the available features : "
+                        f"{self.columns}"
+                    )
+                ) from err
             return self.history_storage[: self.size][:, column_index]
         if isinstance(arg, list):
             columns = arg
@@ -74,18 +80,20 @@ class History:
             for column in columns:
                 try:
                     column_indexes.append(self.columns.index(column))
-                except ValueError:
+                except ValueError as err:
                     raise ValueError(
-                        f"Feature {column} does not exist ... Check the available features : {self.columns}"
-                    )
+                        f"Feature {column} does not exist ... Check the available features : "
+                        f"{self.columns}"
+                    ) from err
             return self.history_storage[: self.size][:, column_indexes]
 
     def __setitem__(self, arg, value):
         column, t = arg
         try:
             column_index = self.columns.index(column)
-        except ValueError:
+        except ValueError as err:
             raise ValueError(
-                f"Feature {column} does not exist ... Check the available features : {self.columns}"
-            )
+                f"Feature {column} does not exist ... Check the available features : "
+                f"{self.columns}"
+            ) from err
         self.history_storage[: self.size][t, column_index] = value
