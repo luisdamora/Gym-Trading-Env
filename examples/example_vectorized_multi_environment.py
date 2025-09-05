@@ -2,6 +2,13 @@ import sys
 
 sys.path.append("./src")
 
+__doc__ = """Run a vectorized trading environment across multiple datasets.
+
+This example demonstrates `MultiDatasetTradingEnv` with a preprocessing
+function to engineer features for each dataset discovered in a directory.
+It runs a simple stepping loop with fixed actions for illustration purposes.
+"""
+
 
 import gymnasium as gym
 import numpy as np
@@ -9,6 +16,19 @@ import pandas as pd
 
 
 def add_features(df: pd.DataFrame):
+    """Add basic technical features required by the environment.
+
+    The produced columns must include the keyword "feature" in their names
+    to be recognized by the environment as part of the observation space.
+
+    Args:
+        df (pd.DataFrame): Input OHLCV dataframe with columns such as
+            `open`, `high`, `low`, `close`, and `volume`.
+
+    Returns:
+        pd.DataFrame: The same dataframe with added feature columns and
+        cleaned of NaNs after feature computation.
+    """
     df["feature_close"] = df["close"].pct_change()
     df["feature_open"] = df["open"] / df["close"]
     df["feature_high"] = df["high"] / df["close"]
@@ -20,6 +40,20 @@ def add_features(df: pd.DataFrame):
 
 
 def reward_function(history):
+    """Compute the log-return between the last two portfolio valuations.
+
+    Args:
+        history (Any): A history accessor that supports tuple-style indexing
+            like `history["portfolio_valuation", -1]`.
+
+    Returns:
+        float: The logarithmic return, i.e., `log(p_t / p_{t-1})`.
+
+    Raises:
+        KeyError: If the required keys are missing.
+        IndexError: If fewer than two entries are available.
+        TypeError: If the values cannot be used in numeric operations.
+    """
     return np.log(
         history["portfolio_valuation", -1] / history["portfolio_valuation", -2]
     )  # log (p_t / p_t-1 )

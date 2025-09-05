@@ -1,3 +1,20 @@
+"""Single-environment example using `TradingEnv`.
+
+This example loads a BTC/USD hourly dataset, engineers basic features,
+defines a simple log-return reward function, and runs a short episode in
+the `TradingEnv`. At the end, it saves logs for later rendering.
+
+Args:
+    None: This module is intended to be executed directly.
+
+Returns:
+    None: Prints observations and saves render logs to disk.
+
+Raises:
+    Exception: Any exception from data loading, preprocessing, or the
+        environment interaction will propagate.
+"""
+
 import sys
 
 sys.path.append("./src")
@@ -25,6 +42,19 @@ df.dropna(inplace=True)
 
 # Create your own reward function with the history object
 def reward_function(history):
+    """Compute step reward as the log change of portfolio valuation.
+
+    Args:
+        history: A history-like structure exposing the `portfolio_valuation`
+            time series that can be indexed with `["portfolio_valuation", idx]`.
+
+    Returns:
+        float: The log return between the last and the previous step.
+
+    Raises:
+        KeyError: If `"portfolio_valuation"` is missing in `history`.
+        IndexError: If the last or previous entries are not available.
+    """
     return np.log(
         history["portfolio_valuation", -1] / history["portfolio_valuation", -2]
     )  # log (p_t / p_t-1 )

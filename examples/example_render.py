@@ -2,6 +2,14 @@ import sys
 
 sys.path.append("./src")
 
+__doc__ = """Render a trading session using the built-in Renderer.
+
+This example script instantiates `gym_trading_env.renderer.Renderer` and runs
+it to visualize trades, price series, custom lines, and metrics. Uncomment the
+example blocks below to add moving averages and annualized return metrics to
+the rendered view.
+"""
+
 from gym_trading_env.renderer import Renderer
 
 renderer = Renderer(render_logs_dir="render_logs")

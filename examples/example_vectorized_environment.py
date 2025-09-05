@@ -2,6 +2,13 @@ import sys
 
 sys.path.append("./src")
 
+__doc__ = """Run a vectorized trading environment with a single dataset.
+
+This example downloads market data, engineers a minimal set of features, and
+launches a vectorized `TradingEnv` using Gymnasium's vector API. It then
+executes a simple loop with fixed actions to demonstrate environment stepping.
+"""
+
 import datetime
 
 import gymnasium as gym
@@ -37,6 +44,21 @@ print(df)
 
 
 def reward_function(history):
+    """Compute the log-return between the last two portfolio valuations.
+
+    Args:
+        history (Any): A history accessor that supports tuple-style access
+            like `history["portfolio_valuation", -1]` to retrieve the most
+            recent and previous portfolio valuations.
+
+    Returns:
+        float: The logarithmic return, i.e., `log(p_t / p_{t-1})`.
+
+    Raises:
+        KeyError: If the required keys are not present in `history`.
+        IndexError: If the history does not contain at least two entries.
+        TypeError: If the accessed values do not support numeric operations.
+    """
     return np.log(
         history["portfolio_valuation", -1] / history["portfolio_valuation", -2]
     )  # log (p_t / p_t-1 )
