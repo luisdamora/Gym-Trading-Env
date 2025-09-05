@@ -3,6 +3,27 @@ from pyecharts.charts import Bar, Candlestick, Grid, Line
 
 
 def charts(df, lines=None):
+    """Build an interactive trading dashboard grid with candlesticks and metrics.
+
+    Constructs a pyecharts grid composed of candlesticks, volume, portfolio value,
+    position steps, cumulative rewards, and optional indicator overlay lines.
+
+    Args:
+        df (pandas.DataFrame): DataFrame indexed by datetime containing at least
+            the columns `open`, `close`, `low`, `high`, `volume`, `reward`,
+            `position`, and `portfolio_valuation`. The index is formatted to
+            strings for x-axis display.
+        lines (list[dict] | None): Optional. A list of dictionaries defining
+            overlay indicator lines. Each dict must include:
+            - "name" (str): Series name.
+            - "function" (Callable[[pandas.DataFrame], pandas.Series | numpy.ndarray]):
+              Function computing a series from `df`.
+            - "line_options" (dict, optional): Style options forwarded to
+              `opts.LineStyleOpts`.
+
+    Returns:
+        pyecharts.charts.Grid: The composed grid chart ready to render.
+    """
     if lines is None:
         lines = []
     line_key = "ievi4G3vG678Vszad"
