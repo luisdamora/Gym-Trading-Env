@@ -19,6 +19,24 @@ classifiers = [
 ]
 dependencies = ["pandas>=1.5.3", "numpy>=1.21.1", "gymnasium>=0.28.1", "flask>=2.2.3", "pyecharts>=2.0.2", "ccxt==3.0.59", "nest_asyncio"]
 
+[tool.ruff]
+line-length = 100
+target-version = "py37"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B"]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[project.optional-dependencies]
+dev = [
+  "ruff>=0.6.9,<1.0.0",
+  "pytest>=8.4.1,<9.0.0",
+]
+
 [project.urls]
 "Homepage" = "https://github.com/ClementPerroud/Gym-Trading-Env"
 "Bug Tracker" = "https://github.com/ClementPerroud/Gym-Trading-Env/issues"
