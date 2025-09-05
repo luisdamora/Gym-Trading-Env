@@ -1,3 +1,10 @@
+"""Environment registrations for Gym-Trading-Env.
+
+This module registers the Gymnasium environments exposed by this package so
+they can be created via ``gym.make("TradingEnv")`` and
+``gym.make("MultiDatasetTradingEnv")``.
+"""
+
 from gymnasium.envs.registration import register
 
 register(

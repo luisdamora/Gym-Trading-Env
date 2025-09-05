@@ -1,3 +1,27 @@
+"""Asynchronous OHLCV data downloader utilities.
+
+This module provides helper coroutines to download OHLCV data from multiple
+exchanges supported by ``ccxt``. It handles rate limits per exchange,
+splits long time ranges into smaller windows, and saves results as pickles.
+
+Example:
+    The easiest way to use the downloader is via the ``download`` function:
+
+    ```python
+    import datetime as dt
+    from gym_trading_env.downloader import download
+
+    download(
+        exchange_names=["binance"],
+        symbols=["BTC/USDT"],
+        timeframe="1h",
+        dir="data",
+        since=dt.datetime(2021, 1, 1),
+        until=dt.datetime(2021, 6, 1),
+    )
+    ```
+"""
+
 import asyncio
 import datetime
 import sys
@@ -32,6 +56,20 @@ EXCHANGE_LIMIT_RATES = {
 
 
 async def _ohlcv(exchange, symbol, timeframe, limit, step_since, timedelta):
+    """Fetch one OHLCV window and return it as a formatted DataFrame.
+
+    Args:
+        exchange: An instantiated ``ccxt`` exchange with async support.
+        symbol (str): Trading pair symbol (e.g., ``"BTC/USDT"``).
+        timeframe (str): CCXT timeframe string (e.g., ``"1h"``, ``"5m"``).
+        limit (int): Max number of candles to fetch in a single call.
+        step_since (int): Millisecond timestamp from which to start fetching.
+        timedelta (int): Number of milliseconds per candle for the timeframe.
+
+    Returns:
+        pandas.DataFrame: A DataFrame with columns
+        ``[timestamp_open, open, high, low, close, volume, date_open, date_close]``.
+    """
     result = await exchange.fetch_ohlcv(
         symbol=symbol, timeframe=timeframe, limit=limit, since=step_since
     )
@@ -56,6 +94,29 @@ async def _download_symbol(
     pause_every=10,
     pause=1,
 ):
+    """Download OHLCV data for a single symbol from a given exchange.
+
+    The function chunks the time interval into windows sized by ``limit`` and
+    ``timeframe``, schedules async tasks accordingly, and concatenates the
+    results.
+
+    Args:
+        exchange: A configured async ``ccxt`` exchange instance.
+        symbol (str): Trading pair symbol (e.g., ``"BTC/USDT"``).
+        timeframe (str): CCXT timeframe string. Defaults to ``"5m"``.
+        since (int | None): Millisecond timestamp (inclusive) to start from. If
+            ``None``, defaults to Jan 1, 2020.
+        until (int | None): Millisecond timestamp (exclusive) to stop at. If
+            ``None``, defaults to now.
+        limit (int): Max candles per request. Defaults to 1000.
+        pause_every (int): After scheduling this many requests, pause for
+            ``pause`` seconds. Helps with rate limits.
+        pause (int | float): Pause duration in seconds between request batches.
+
+    Returns:
+        pandas.DataFrame: Cleaned OHLCV DataFrame indexed by ``date_open`` and
+        sorted by index without duplicates.
+    """
     if since is None:
         since = int(datetime.datetime(year=2020, month=1, day=1).timestamp() * 1e3)
     if until is None:
@@ -86,6 +147,18 @@ async def _download_symbol(
 
 
 async def _download_symbols(exchange_name, symbols, dir, timeframe, **kwargs):
+    """Download OHLCV data for multiple symbols from a single exchange.
+
+    Args:
+        exchange_name (str): The CCXT exchange id (e.g., ``"binance"``).
+        symbols (list[str]): List of symbols to download.
+        dir (str): Directory where results will be saved as pickles.
+        timeframe (str): CCXT timeframe string.
+        **kwargs: Forwarded to ``_download_symbol`` (e.g., ``limit``, ``since``).
+
+    Returns:
+        None
+    """
     exchange = getattr(ccxt, exchange_name)({"enableRateLimit": True})
     for symbol in symbols:
         df = await _download_symbol(exchange=exchange, symbol=symbol, timeframe=timeframe, **kwargs)
@@ -103,6 +176,22 @@ async def _download(
     since: datetime.datetime,
     until: datetime.datetime = None,
 ):
+    """Coordinate downloads across multiple exchanges concurrently.
+
+    For each exchange, configures rate-limit parameters based on
+    ``EXCHANGE_LIMIT_RATES`` and schedules symbol downloads.
+
+    Args:
+        exchange_names (list[str]): CCXT exchange ids to use.
+        symbols (list[str]): Trading symbols to download for each exchange.
+        timeframe (str): CCXT timeframe string.
+        dir (str): Destination directory for pickles.
+        since (datetime.datetime): Start datetime (inclusive).
+        until (datetime.datetime | None): End datetime (exclusive). Defaults to now.
+
+    Returns:
+        None
+    """
     if until is None:
         until = datetime.datetime.now()
     tasks = []
@@ -127,11 +216,31 @@ async def _download(
 
 
 def download(*args, **kwargs):
+    """Synchronous wrapper to run the asynchronous download pipeline.
+
+    This function starts a fresh event loop to run ``_download``.
+
+    Args:
+        *args: Forwarded to ``_download``.
+        **kwargs: Forwarded to ``_download``.
+
+    Returns:
+        None
+    """
     # loop = asyncio.get_event_loop()
     asyncio.run(_download(*args, **kwargs))
 
 
 async def main():
+    """Example entry point to trigger a sample data download.
+
+    Note:
+        Intended for manual testing. When executed as a script, downloads two
+        symbols across several exchanges.
+
+    Returns:
+        None
+    """
     await _download(
         ["binance", "bitfinex2", "huobi"],
         symbols=["BTC/USDT", "ETH/USDT"],

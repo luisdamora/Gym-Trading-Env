@@ -16,14 +16,61 @@ warnings.filterwarnings("error")
 
 
 def basic_reward_function(history: History):
+    """Compute the default reward as log return of portfolio valuation.
+
+    The reward is computed as the natural logarithm of the ratio between the
+    last portfolio valuation and the previous one. This favors smooth
+    compounding behavior and is a common choice in trading environments.
+
+    Args:
+        history (History): The history buffer containing tracked environment
+            values. Must support indexing like ``history["portfolio_valuation", -1]``.
+
+    Returns:
+        float: The log return between the last and previous portfolio valuation.
+
+    Raises:
+        KeyError: If the required keys are not present in history.
+        IndexError: If there are not enough entries in history to compute the
+            reward.
+    """
     return np.log(history["portfolio_valuation", -1] / history["portfolio_valuation", -2])
 
 
 def dynamic_feature_last_position_taken(history):
+    """Return the last position taken by the agent.
+
+    Args:
+        history (History): The history buffer that stores the last position
+            selected by the agent.
+
+    Returns:
+        float | int: The last position value recorded in history.
+
+    Raises:
+        KeyError: If the "position" key is missing in history.
+        IndexError: If history does not contain any entries yet.
+    """
     return history["position", -1]
 
 
 def dynamic_feature_real_position(history):
+    """Return the real (effective) position of the portfolio.
+
+    This may differ from the target position due to price fluctuations or
+    trading costs.
+
+    Args:
+        history (History): The history buffer that stores the effective
+            position.
+
+    Returns:
+        float: The current effective position of the portfolio.
+
+    Raises:
+        KeyError: If the "real_position" key is missing in history.
+        IndexError: If history does not contain any entries yet.
+    """
     return history["real_position", -1]
 
 
@@ -111,6 +158,46 @@ class TradingEnv(gym.Env):
         name="Stock",
         render_mode="logs",
     ):
+        """Initialize the trading environment.
+
+        Args:
+            df (pandas.DataFrame): Market data with required columns (e.g.,
+                ``open``, ``high``, ``low``, ``close``). Index should be a
+                ``DatetimeIndex``. Columns containing the substring
+                "feature" will be used as observations.
+            positions (list, optional): Allowed discrete positions (e.g.,
+                ``[0, 1]`` or ``[-1, 0, 1]``). Defaults to ``[0, 1]`` if not
+                provided.
+            dynamic_feature_functions (list, optional): List of callables that
+                map ``History`` to a float feature appended to the observation.
+                Defaults to two built-ins: last position and real position.
+            reward_function (callable): Function mapping ``History`` to a float
+                reward. Defaults to ``basic_reward_function``.
+            windows (int | None, optional): If provided, the observation stacks
+                the last ``windows`` frames. Useful for RNN-based agents.
+            trading_fees (float, optional): Proportional transaction fee applied
+                on trades. Example: ``0.01`` for 1% fees. Defaults to 0.
+            borrow_interest_rate (float, optional): Per-step borrow interest
+                rate applied when leverage-like positions are held. Defaults to 0.
+            portfolio_initial_value (float | int, optional): Initial portfolio
+                valuation. Defaults to 1000.
+            initial_position (float | int | str, optional): Initial position or
+                ``"random"`` to sample from ``positions``. Defaults to
+                ``"random"``.
+            max_episode_duration (int | str, optional): Truncate episode after
+                this many steps. Use ``"max"`` to run to dataset end. Defaults to
+                ``"max"``.
+            verbose (int, optional): If > 0, prints metrics at episode end.
+                Defaults to 1.
+            name (str, optional): Environment name (e.g., ``"BTC/USDT"``).
+                Defaults to ``"Stock"``.
+            render_mode (str | None, optional): Rendering mode. Only "logs" is
+                supported. Defaults to "logs".
+
+        Raises:
+            AssertionError: If ``initial_position`` is invalid or ``render_mode``
+                is not supported.
+        """
         if positions is None:
             positions = [0, 1]
         if dynamic_feature_functions is None:
@@ -149,6 +236,19 @@ class TradingEnv(gym.Env):
         self.log_metrics = []
 
     def _set_df(self, df):
+        """Prepare and cache arrays and columns from the input dataset.
+
+        Creates internal arrays for observations, info features and prices, and
+        augments the DataFrame with dynamic feature placeholders.
+
+        Args:
+            df (pandas.DataFrame): The market data. Must include a ``close``
+                column and any number of columns tagged as features by
+                including the substring "feature" in their names.
+
+        Returns:
+            None: This method mutates internal state.
+        """
         df = df.copy()
         self._features_columns = [col for col in df.columns if "feature" in col]
         self._info_columns = list(set(list(df.columns) + ["close"]) - set(self._features_columns))
@@ -166,12 +266,36 @@ class TradingEnv(gym.Env):
         self._price_array = np.array(self.df["close"])
 
     def _get_ticker(self, delta=0):
+        """Get the row in the dataset at the current index plus a delta.
+
+        Args:
+            delta (int): Offset from the current index. Defaults to 0.
+
+        Returns:
+            pandas.Series: The row representing the ticker information.
+        """
         return self.df.iloc[self._idx + delta]
 
     def _get_price(self, delta=0):
+        """Return the close price at the current index plus a delta.
+
+        Args:
+            delta (int): Offset from the current index. Defaults to 0.
+
+        Returns:
+            float: The price value.
+        """
         return self._price_array[self._idx + delta]
 
     def _get_obs(self):
+        """Build the observation vector (and dynamic features) for the step.
+
+        Returns the observation at the current index, optionally stacking the
+        last ``windows`` frames if configured.
+
+        Returns:
+            numpy.ndarray: Observation array with static and dynamic features.
+        """
         for i, dynamic_feature_function in enumerate(self.dynamic_feature_functions):
             self._obs_array[self._idx, self._nb_static_features + i] = dynamic_feature_function(
                 self.historical_info
@@ -184,6 +308,19 @@ class TradingEnv(gym.Env):
         return self._obs_array[_step_index]
 
     def reset(self, seed=None, options=None, **kwargs):
+        """Reset the environment state at the beginning of an episode.
+
+        This initializes portfolio, positions, indices, and the history buffer.
+
+        Args:
+            seed (int | None): Random seed for reproducibility. Optional.
+            options (dict | None): Additional options for Gymnasium. Optional.
+            **kwargs: Forwarded to ``gym.Env.reset``.
+
+        Returns:
+            tuple[numpy.ndarray, dict]: The initial observation and initial info
+            dict (first entry of history).
+        """
         super().reset(seed=seed, options=options, **kwargs)
 
         self._step = 0
@@ -223,9 +360,28 @@ class TradingEnv(gym.Env):
         return self._get_obs(), self.historical_info[0]
 
     def render(self):
+        """Render the environment.
+
+        Note:
+            Rendering is not implemented for this environment. Use
+            ``save_for_render`` in conjunction with the renderer utility.
+
+        Returns:
+            None: No rendering is performed.
+        """
         pass
 
     def _trade(self, position, price=None):
+        """Execute a trade to move the portfolio to a target position.
+
+        Args:
+            position (float | int): Target position to set in the portfolio.
+            price (float | None): Execution price. If ``None``, uses current
+                market price from the dataset.
+
+        Returns:
+            None: The internal portfolio state is updated.
+        """
         self._portfolio.trade_to_position(
             position,
             price=self._get_price() if price is None else price,
@@ -235,10 +391,27 @@ class TradingEnv(gym.Env):
         return
 
     def _take_action(self, position):
+        """Update position by trading if the requested position differs.
+
+        Args:
+            position (float | int): Desired position.
+
+        Returns:
+            None
+        """
         if position != self._position:
             self._trade(position)
 
     def _take_action_order_limit(self):
+        """Evaluate and execute pending limit orders if their conditions meet.
+
+        Iterates over stored limit orders and triggers trades when the current
+        ticker's high/low encompasses the limit price. Non-persistent orders are
+        removed once executed.
+
+        Returns:
+            None
+        """
         if len(self._limit_orders) > 0:
             ticker = self._get_ticker()
             for position, params in self._limit_orders.items():
@@ -252,9 +425,38 @@ class TradingEnv(gym.Env):
                         del self._limit_orders[position]
 
     def add_limit_order(self, position, limit, persistent=False):
+        """Add a limit order to be executed when price reaches a level.
+
+        Args:
+            position (float | int): Target position when the order is triggered.
+            limit (float): The limit price for execution.
+            persistent (bool): If ``True``, the order remains after execution
+                (useful for grid-like strategies). Defaults to ``False``.
+
+        Returns:
+            None
+        """
         self._limit_orders[position] = {"limit": limit, "persistent": persistent}
 
     def step(self, position_index=None):
+        """Advance the environment by one step.
+
+        Applies the selected action, updates the portfolio, computes reward,
+        and returns the new observation along with termination flags and info.
+
+        Args:
+            position_index (int | None): Index within ``positions`` to select.
+                If ``None``, keeps the current position.
+
+        Returns:
+            tuple: ``(obs, reward, done, truncated, info)`` where
+                - ``obs`` (numpy.ndarray): Next observation.
+                - ``reward`` (float): Current step reward.
+                - ``done`` (bool): Whether the episode terminated due to failure.
+                - ``truncated`` (bool): Whether the episode was truncated due to
+                  max duration or dataset end.
+                - ``info`` (dict): Latest recorded info from history.
+        """
         if position_index is not None:
             self._take_action(self.positions[position_index])
         self._idx += 1
@@ -306,9 +508,26 @@ class TradingEnv(gym.Env):
         )
 
     def add_metric(self, name, function):
+        """Register a custom metric to be computed at episode end.
+
+        Args:
+            name (str): Display name of the metric.
+            function (callable): Function mapping ``History`` to a value.
+
+        Returns:
+            None
+        """
         self.log_metrics.append({"name": name, "function": function})
 
     def calculate_metrics(self):
+        """Compute default and custom episode metrics.
+
+        Populates ``self.results_metrics`` with market and portfolio returns and
+        any custom metrics added via ``add_metric``.
+
+        Returns:
+            None
+        """
         market_return_val = 100 * (
             self.historical_info["data_close", -1] / self.historical_info["data_close", 0] - 1
         )
@@ -326,9 +545,19 @@ class TradingEnv(gym.Env):
             self.results_metrics[metric["name"]] = metric["function"](self.historical_info)
 
     def get_metrics(self):
+        """Return the computed episode metrics.
+
+        Returns:
+            dict: Mapping metric names to their values (usually strings).
+        """
         return self.results_metrics
 
     def log(self):
+        """Print metrics to stdout when verbosity is enabled.
+
+        Returns:
+            None
+        """
         if self.verbose > 0:
             text = ""
             for key, value in self.results_metrics.items():
@@ -336,6 +565,22 @@ class TradingEnv(gym.Env):
             print(text)
 
     def save_for_render(self, dir="render_logs"):
+        """Persist environment and history data for external rendering.
+
+        Saves a merged DataFrame containing market data and environment history
+        to a timestamped pickle file. This can later be visualized with the
+        renderer utility.
+
+        Args:
+            dir (str): Directory where render logs will be written. Created if
+                it does not exist. Defaults to ``"render_logs"``.
+
+        Returns:
+            None
+
+        Raises:
+            AssertionError: If required OHLC columns are missing in ``self.df``.
+        """
         assert (
             "open" in self.df and "high" in self.df and "low" in self.df and "close" in self.df
         ), "Your DataFrame needs to contain columns : open, high, low, close to render !"
@@ -427,6 +672,20 @@ class MultiDatasetTradingEnv(TradingEnv):
         episodes_between_dataset_switch=1,
         **kwargs,
     ):
+        """Initialize the multi-dataset trading environment.
+
+        Args:
+            dataset_dir (str): Glob path matching datasets to be used.
+            *args: Positional arguments forwarded to ``TradingEnv``.
+            preprocess (callable): Function ``(pd.DataFrame) -> pd.DataFrame``
+                applied to each dataset before use. Defaults to identity.
+            episodes_between_dataset_switch (int): Number of episodes to run on
+                the same dataset before switching. Defaults to 1.
+            **kwargs: Keyword arguments forwarded to ``TradingEnv``.
+
+        Raises:
+            FileNotFoundError: If no datasets are found at ``dataset_dir``.
+        """
         self.dataset_dir = dataset_dir
         self.preprocess = preprocess
         self.episodes_between_dataset_switch = episodes_between_dataset_switch
@@ -437,6 +696,11 @@ class MultiDatasetTradingEnv(TradingEnv):
         super().__init__(self.next_dataset(), *args, **kwargs)
 
     def next_dataset(self):
+        """Pick the next dataset to use based on least-usage strategy.
+
+        Returns:
+            pandas.DataFrame: The preprocessed DataFrame of the selected dataset.
+        """
         self._episodes_on_this_dataset = 0
         # Find the indexes of the less explored dataset
         potential_dataset_pathes = np.where(self.dataset_nb_uses == self.dataset_nb_uses.min())[0]
@@ -450,6 +714,19 @@ class MultiDatasetTradingEnv(TradingEnv):
         return self.preprocess(pd.read_pickle(dataset_path))
 
     def reset(self, seed=None, options=None, **kwargs):
+        """Reset state and optionally switch to a different dataset.
+
+        After a configurable number of episodes, the underlying dataset is
+        switched to diversify training and reduce overfitting.
+
+        Args:
+            seed (int | None): Random seed for reproducibility. Optional.
+            options (dict | None): Additional options for Gymnasium. Optional.
+            **kwargs: Forwarded to parent ``reset``.
+
+        Returns:
+            tuple[numpy.ndarray, dict]: The initial observation and info dict.
+        """
         self._episodes_on_this_dataset += 1
         if self._episodes_on_this_dataset % self.episodes_between_dataset_switch == 0:
             self._set_df(self.next_dataset())
