@@ -15,14 +15,8 @@ class Renderer:
         self.df = None
         self.render_logs_dir = render_logs_dir
         self.metrics = [
-            {
-                "name": "Market Return",
-                "function": lambda df: f"{(df['close'].iloc[-1] / df['close'].iloc[0] - 1) * 100:0.2f}%",
-            },
-            {
-                "name": "Portfolio Return",
-                "function": lambda df: f"{(df['portfolio_valuation'].iloc[-1] / df['portfolio_valuation'].iloc[0] - 1) * 100:0.2f}%",
-            },
+            {"name": "Market Return", "function": self._metric_market_return},
+            {"name": "Portfolio Return", "function": self._metric_portfolio_return},
         ]
         self.lines = []
 
@@ -33,6 +27,18 @@ class Renderer:
         self.lines.append({"name": name, "function": function})
         if line_options is not None:
             self.lines[-1]["line_options"] = line_options
+
+    @staticmethod
+    def _metric_market_return(df: pd.DataFrame) -> str:
+        value = (df["close"].iloc[-1] / df["close"].iloc[0] - 1) * 100
+        return f"{value:0.2f}%"
+
+    @staticmethod
+    def _metric_portfolio_return(df: pd.DataFrame) -> str:
+        value = (
+            df["portfolio_valuation"].iloc[-1] / df["portfolio_valuation"].iloc[0] - 1
+        ) * 100
+        return f"{value:0.2f}%"
 
     def compute_metrics(self, df):
         for metric in self.metrics:

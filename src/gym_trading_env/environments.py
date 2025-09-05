@@ -384,7 +384,8 @@ class MultiDatasetTradingEnv(TradingEnv):
         pandas.DataFrame. This function is applied to each dataset before being used
         in the environment.
 
-        For example, imagine you have a folder named 'data' with several datasets (formatted as .pkl)
+        For example, imagine you have a folder named 'data' with several datasets
+        (formatted as .pkl)
 
         .. code-block:: python
 

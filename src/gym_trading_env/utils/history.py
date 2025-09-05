@@ -68,10 +68,8 @@ class History:
                 column_index = self.columns.index(column)
             except ValueError as err:
                 raise ValueError(
-                    (
-                        f"Feature {column} does not exist ... Check the available features : "
-                        f"{self.columns}"
-                    )
+                    f"Feature {column} does not exist ... Check the available features : "
+                    f"{self.columns}"
                 ) from err
             return self.history_storage[: self.size][:, column_index]
         if isinstance(arg, list):
