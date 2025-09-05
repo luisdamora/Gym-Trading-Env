@@ -38,13 +38,16 @@ class TradingEnv(gym.Env):
         env = gym.make('TradingEnv', ...)
 
 
-    :param df: The market DataFrame. It must contain 'open', 'high', 'low', 'close'. Index must be DatetimeIndex. Your desired inputs need to contain 'feature' in their column name : this way, they will be returned as observation at each step.
+    :param df: The market DataFrame. It must contain 'open', 'high', 'low', 'close'.
+        Index must be DatetimeIndex. Your desired inputs need to contain 'feature'
+        in their column name: this way, they will be returned as observation at each step.
     :type df: pandas.DataFrame
 
     :param positions: List of the positions allowed by the environment.
     :type positions: optional - list[int or float]
 
-    :param dynamic_feature_functions: The list of the dynamic features functions. By default, two dynamic features are added :
+    :param dynamic_feature_functions: The list of the dynamic features functions.
+        By default, two dynamic features are added:
 
         * the last position taken by the agent.
         * the real position of the portfolio (that varies according to the price fluctuations)
@@ -54,22 +57,32 @@ class TradingEnv(gym.Env):
     :param reward_function: Take the History object of the environment and must return a float.
     :type reward_function: optional - function<History->float>
 
-    :param windows: Default is None. If it is set to an int: N, every step observation will return the past N observations. It is recommended for Recurrent Neural Network based Agents.
+    :param windows: Default is None. If it is set to an int: N, every step observation
+        will return the past N observations. It is recommended for Recurrent Neural
+        Network based Agents.
     :type windows: optional - None or int
 
-    :param trading_fees: Transaction trading fees (buy and sell operations). eg: 0.01 corresponds to 1% fees
+    :param trading_fees: Transaction trading fees (buy and sell operations).
+        eg: 0.01 corresponds to 1% fees
     :type trading_fees: optional - float
 
-    :param borrow_interest_rate: Borrow interest rate per step (only when position < 0 or position > 1). eg: 0.01 corresponds to 1% borrow interest rate per STEP ; if your know that your borrow interest rate is 0.05% per day and that your timestep is 1 hour, you need to divide it by 24 -> 0.05/100/24.
+    :param borrow_interest_rate: Borrow interest rate per step (only when position < 0
+        or position > 1). eg: 0.01 corresponds to 1% borrow interest rate per STEP;
+        if you know that your borrow interest rate is 0.05% per day and your timestep
+        is 1 hour, you need to divide it by 24 -> 0.05/100/24.
     :type borrow_interest_rate: optional - float
 
     :param portfolio_initial_value: Initial valuation of the portfolio.
     :type portfolio_initial_value: float or int
 
-    :param initial_position: You can specify the initial position of the environment or set it to 'random'. It must contained in the list parameter 'positions'.
+    :param initial_position: You can specify the initial position of the environment
+        or set it to 'random'. It must be contained in the list parameter 'positions'.
     :type initial_position: optional - float or int
 
-    :param max_episode_duration: If a integer value is used, each episode will be truncated after reaching the desired max duration in steps (by returning `truncated` as `True`). When using a max duration, each episode will start at a random starting point.
+    :param max_episode_duration: If an integer value is used, each episode will be
+        truncated after reaching the desired max duration in steps (by returning
+        `truncated` as `True`). When using a max duration, each episode will start at
+        a random starting point.
     :type max_episode_duration: optional - int or 'max'
 
     :param verbose: If 0, no log is outputted. If 1, the env send episode result logs.
@@ -85,11 +98,8 @@ class TradingEnv(gym.Env):
     def __init__(
         self,
         df: pd.DataFrame,
-        positions: list = [0, 1],
-        dynamic_feature_functions=[
-            dynamic_feature_last_position_taken,
-            dynamic_feature_real_position,
-        ],
+        positions: list = None,
+        dynamic_feature_functions=None,
         reward_function=basic_reward_function,
         windows=None,
         trading_fees=0,
@@ -101,6 +111,13 @@ class TradingEnv(gym.Env):
         name="Stock",
         render_mode="logs",
     ):
+        if positions is None:
+            positions = [0, 1]
+        if dynamic_feature_functions is None:
+            dynamic_feature_functions = [
+                dynamic_feature_last_position_taken,
+                dynamic_feature_real_position,
+            ]
         self.max_episode_duration = max_episode_duration
         self.name = name
         self.verbose = verbose
@@ -114,7 +131,8 @@ class TradingEnv(gym.Env):
         self.portfolio_initial_value = float(portfolio_initial_value)
         self.initial_position = initial_position
         assert self.initial_position in self.positions or self.initial_position == "random", (
-            "The 'initial_position' parameter must be 'random' or a position mentionned in the 'position' (default is [0, 1]) parameter."
+            "The 'initial_position' parameter must be 'random' or a position mentionned "
+            "in the 'position' (default is [0, 1]) parameter."
         )
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.max_episode_duration = max_episode_duration
@@ -291,9 +309,17 @@ class TradingEnv(gym.Env):
         self.log_metrics.append({"name": name, "function": function})
 
     def calculate_metrics(self):
+        market_return_val = 100 * (
+            self.historical_info["data_close", -1] / self.historical_info["data_close", 0] - 1
+        )
+        portfolio_return_val = 100 * (
+            self.historical_info["portfolio_valuation", -1]
+            / self.historical_info["portfolio_valuation", 0]
+            - 1
+        )
         self.results_metrics = {
-            "Market Return": f"{100 * (self.historical_info['data_close', -1] / self.historical_info['data_close', 0] - 1):5.2f}%",
-            "Portfolio Return": f"{100 * (self.historical_info['portfolio_valuation', -1] / self.historical_info['portfolio_valuation', 0] - 1):5.2f}%",
+            "Market Return": f"{market_return_val:5.2f}%",
+            "Portfolio Return": f"{portfolio_return_val:5.2f}%",
         }
 
         for metric in self.log_metrics:
@@ -332,8 +358,8 @@ class MultiDatasetTradingEnv(TradingEnv):
     """
     (Inherits from TradingEnv) A TradingEnv environment that handles multiple datasets.
     It automatically switches from one dataset to another at the end of an episode.
-    Bringing diversity by having several datasets, even from the same pair from different exchanges, is a good idea.
-    This should help avoiding overfitting.
+    Bringing diversity by having several datasets, even from the same pair from
+    different exchanges, is a good idea. This should help avoiding overfitting.
 
     It is recommended to use it this way :
 
@@ -348,10 +374,15 @@ class MultiDatasetTradingEnv(TradingEnv):
 
 
 
-    :param dataset_dir: A `glob path <https://docs.python.org/3.6/library/glob.html>`_ that needs to match your datasets. All of your datasets needs to match the dataset requirements (see docs from TradingEnv). If it is not the case, you can use the ``preprocess`` param to make your datasets match the requirements.
+    :param dataset_dir: A `glob path <https://docs.python.org/3.6/library/glob.html>`_
+        that needs to match your datasets. All of your datasets need to match the
+        dataset requirements (see docs from TradingEnv). If it is not the case, you
+        can use the ``preprocess`` param to make your datasets match the requirements.
     :type dataset_dir: str
 
-    :param preprocess: This function takes a pandas.DataFrame and returns a pandas.DataFrame. This function is applied to each dataset before being used in the environment.
+    :param preprocess: This function takes a pandas.DataFrame and returns a
+        pandas.DataFrame. This function is applied to each dataset before being used
+        in the environment.
 
         For example, imagine you have a folder named 'data' with several datasets (formatted as .pkl)
 
@@ -381,7 +412,9 @@ class MultiDatasetTradingEnv(TradingEnv):
 
     :type preprocess: function<pandas.DataFrame->pandas.DataFrame>
 
-    :param episodes_between_dataset_switch: Number of times a dataset is used to create an episode, before moving on to another dataset. It can be useful for performances when `max_episode_duration` is low.
+    :param episodes_between_dataset_switch: Number of times a dataset is used to create
+        an episode, before moving on to another dataset. It can be useful for
+        performances when `max_episode_duration` is low.
     :type episodes_between_dataset_switch: optional - int
     """
 
